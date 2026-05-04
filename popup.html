@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <span class="title">LiveStream Notifier</span>
+    <div class="header-actions">
+      <button id="refresh-btn" title="今すぐ確認">↻</button>
+      <button id="opts-btn" title="設定">⚙</button>
+    </div>
+  </header>
+
+  <div id="channel-list"></div>
+
+  <footer>
+    <button id="add-toggle">＋ チャンネルを追加</button>
+    <form id="add-form" hidden>
+      <input id="input-query" type="text" placeholder="@ハンドル / チャンネルURL / チャンネルID" required>
+      <input id="input-name"  type="text" placeholder="表示名（自動入力されます）">
+      <div id="add-error" class="add-error" hidden></div>
+      <div class="form-actions">
+        <button type="submit" id="submit-btn">追加</button>
+        <button type="button" id="cancel-btn">キャンセル</button>
+      </div>
+    </form>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

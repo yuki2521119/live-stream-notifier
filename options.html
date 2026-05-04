@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>LiveStream Notifier - 設定</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>設定</h1>
+
+    <section>
+      <label class="field">
+        <span>ポーリング間隔</span>
+        <div class="input-unit">
+          <input id="interval" type="number" min="1" max="60" value="5">
+          <span>分</span>
+        </div>
+      </label>
+
+      <label class="field">
+        <span>自動起動タイミング</span>
+        <div class="input-unit">
+          <input id="minutes-before" type="number" min="0" max="60" value="0">
+          <span>分前（0 = 配信開始時）</span>
+        </div>
+      </label>
+    </section>
+
+    <section>
+      <label class="field">
+        <span>デスクトップ通知</span>
+        <label class="toggle">
+          <input id="notification" type="checkbox" checked>
+          <span class="slider"></span>
+        </label>
+      </label>
+    </section>
+
+    <section>
+      <label class="field">
+        <span>おやすみ時間</span>
+        <label class="toggle">
+          <input id="quiet-enabled" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </label>
+      <div id="quiet-range" class="sub-field" hidden>
+        <label>開始 <input id="quiet-start" type="time" value="23:00"></label>
+        <span>〜</span>
+        <label>終了 <input id="quiet-end" type="time" value="07:00"></label>
+      </div>
+    </section>
+
+    <section>
+      <label class="field">
+        <span>優先順位モード</span>
+        <label class="toggle">
+          <input id="priority-enabled" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </label>
+      <p class="hint">ON にすると、複数チャンネルが同時に配信開始した場合、最上位の 1 件のみタブを開きます。</p>
+
+      <div id="priority-list-wrap">
+        <p class="sub-label">並び順（上が優先）</p>
+        <ul id="priority-list"></ul>
+      </div>
+    </section>
+
+    <div class="actions">
+      <span id="save-msg" class="save-msg"></span>
+      <button id="save-btn">保存</button>
+    </div>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+</html>

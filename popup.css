@@ -1,0 +1,193 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 340px;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  color: #222;
+  background: #fff;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.title { font-weight: 600; font-size: 14px; }
+
+.header-actions { display: flex; gap: 4px; }
+
+header button {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #555;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+header button:hover { background: #f0f0f0; }
+header button.spinning { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── チャンネル一覧 ─── */
+#channel-list { min-height: 40px; }
+
+.empty {
+  padding: 24px 12px;
+  text-align: center;
+  color: #999;
+}
+
+.channel-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.channel-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.channel-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.status-icon { font-size: 14px; flex-shrink: 0; }
+
+.channel-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-label { font-size: 11px; color: #888; flex-shrink: 0; }
+
+/* 配信予定：タイトルと時刻 */
+.stream-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 3px;
+  padding-left: 22px; /* status-icon 幅分インデント */
+  overflow: hidden;
+}
+
+.stream-title {
+  font-size: 11px;
+  color: #444;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.stream-time {
+  font-size: 11px;
+  color: #e03232;
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+/* トグルスイッチ */
+.toggle {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle .slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.toggle .slider::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.toggle input:checked + .slider { background: #e03232; }
+.toggle input:checked + .slider::before { transform: translateX(14px); }
+
+.del-btn {
+  background: none;
+  border: none;
+  color: #bbb;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.del-btn:hover { color: #e03232; background: #fff0f0; }
+
+/* ─── フッター ─── */
+footer { padding: 8px 12px; border-top: 1px solid #e5e5e5; }
+
+#add-toggle {
+  width: 100%;
+  padding: 6px;
+  background: none;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #555;
+  font-size: 12px;
+}
+#add-toggle:hover { background: #f8f8f8; }
+
+#add-form { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+
+.add-error {
+  font-size: 11px;
+  color: #e03232;
+  padding: 2px 0;
+}
+
+#submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+#add-form input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.form-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.form-actions button {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  font-size: 12px;
+  background: #fff;
+}
+.form-actions button[type="submit"] {
+  background: #e03232;
+  color: #fff;
+  border-color: #e03232;
+}
+.form-actions button[type="submit"]:hover { background: #c02020; }
