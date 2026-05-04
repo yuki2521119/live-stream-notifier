@@ -25,8 +25,9 @@
 
 - 監視中のチャンネル一覧を表示
 - 各チャンネルのライブ状態（配信中 / 配信予定 / オフライン）を表示
+- 配信予定チャンネルは配信タイトルと開始時刻をあわせて表示
 - 各チャンネルの自動タブオープン ON/OFF トグル（デフォルト：OFF）
-- チャンネルの追加・削除
+- チャンネルの追加（@ハンドル / チャンネルURL / チャンネルID に対応）・削除
 - 設定ページへのリンク
 
 ### 設定ページ（options）
@@ -42,6 +43,7 @@
 ## チャンネルのデータ構造
 
 ```js
+// storage.sync に保存
 {
   id: "UCxxxxxx",      // YouTube チャンネル ID
   name: "チャンネル名",
@@ -56,6 +58,7 @@
 ## 設定のデータ構造
 
 ```js
+// storage.sync に保存
 {
   intervalMinutes: 5,        // ポーリング間隔（分）
   minutesBefore: 0,          // 配信開始の何分前にタブを開くか
@@ -68,6 +71,29 @@
   }
 }
 ```
+
+---
+
+## ローカルストレージのデータ構造
+
+```js
+// storage.local に保存
+{
+  liveState: {
+    [channelId]: "active" | "upcoming" | "offline"   // 前回の検知結果
+  },
+  upcomingInfo: {
+    [channelId]: {
+      videoId: "VIDEO_ID",       // 配信の動画ID
+      title: "配信タイトル",      // 配信タイトル（取得できない場合は空文字）
+      scheduledAt: 1234567890000, // 開始予定時刻（ミリ秒） または null
+      alarmSet: false             // 起動アラームをセット済みか
+    }
+  }
+}
+```
+
+チャンネル削除時は `liveState` と `upcomingInfo` の対応エントリも同時に削除する。
 
 ---
 
@@ -90,16 +116,12 @@
 
 ## 「N 分前に起動」の実装方針
 
-RSS フィードの `upcoming` エントリには開始予定時刻が含まれないため、YouTube の動画ページ（`youtube.com/watch?v=VIDEO_ID`）に埋め込まれた `ytInitialData` JSON をスクレイピングして `scheduledStartTime` を取得する。APIキー不要。
+`/channel/CHANNEL_ID/live` のページには `scheduledStartTime` が含まれるため、同じリクエストで開始予定時刻を取得できる。
 
 ### フロー
 
 ```
-RSS で upcoming を検知（videoId 取得）
-  ↓
-youtube.com/watch?v=VIDEO_ID を fetch
-  ↓
-ytInitialData 内の scheduledStartTime を正規表現で抽出
+/live ページで upcoming を検知（videoId・scheduledStartTime 取得）
   ↓
 (scheduledStartTime - minutesBefore) の時刻に chrome.alarms をセット
   ↓
@@ -108,11 +130,11 @@ ytInitialData 内の scheduledStartTime を正規表現で抽出
 
 ### minutesBefore = 0 の場合（デフォルト）
 
-`active` を検知した時点でタブを開く。スクレイピング不要。
+`active` を検知した時点でタブを開く。
 
 ### minutesBefore > 0 の場合
 
-`upcoming` 段階でスクレイピングし、指定時刻にアラームをセット。`scheduledStartTime` が取得できなかった場合は `active` 検知時にフォールバック。
+`upcoming` 段階でアラームをセット。`scheduledStartTime` が取得できなかった場合は `active` 検知時にフォールバック。
 
 ---
 
@@ -124,18 +146,39 @@ ytInitialData 内の scheduledStartTime を正規表現で抽出
 - Service Worker（`background.js`）でバックグラウンド監視
 - `chrome.alarms` で定期起動（最小 1 分間隔）
 - `chrome.storage.sync` でチャンネル一覧・設定を保存
-- `chrome.storage.local` でライブ状態（前回の検知結果）・予約済みアラームを保存
+- `chrome.storage.local` でライブ状態・upcomingInfo を保存
 - `chrome.notifications` でデスクトップ通知
 - `chrome.tabs.create()` でタブを自動オープン
 
 ### YouTube 配信検知
 
-- YouTube RSS フィード（APIキー不要）
-  - URL：`https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID`
-  - `active` で現在ライブ中、`upcoming` で配信予定を判定
-  - 検知遅延：最大 5 分（YouTube 側の RSS 更新頻度による）
-- XML パース：正規表現（Service Worker は DOMParser 非対応のため）
-- `minutesBefore > 0` の場合：`youtube.com/watch?v=VIDEO_ID` から `ytInitialData` をスクレイピングして `scheduledStartTime` を取得
+RSS フィードには `liveBroadcastStatus` が含まれないため使用しない。代わりに `youtube.com/channel/CHANNEL_ID/live` を fetch して判定する。このURLはYouTubeが「最も直近のライブ・配信予定」を返す特殊URLで、複数の枠が存在する場合も自動的に最直近の1件を返す。
+
+#### ライブ状態の判定ロジック
+
+```
+html に "isUpcoming":true が含まれる → upcoming（配信予定）
+  ↓ 含まれない
+html に "isLive":true が含まれる     → active（配信中）
+  ↓ 含まれない
+                                       offline
+```
+
+`"isUpcoming":true` を先にチェックすることで、ウェイティングルームを `active` と誤判定しない。
+
+#### videoId・タイトルの取得
+
+ytInitialData 内の `videoDetails` から `"videoId":"...","title":"..."` のパターンでペアとして取得する。単独の `"videoId":"..."` は関係ないチャンネルのIDを拾うリスクがあるため使用しない。
+
+```javascript
+const detailsMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})","title":"((?:[^"\\]|\\.)*)"/);
+// detailsMatch[1] → videoId
+// detailsMatch[2] → title
+```
+
+#### チャンネルID解決（@ハンドル入力時）
+
+`youtube.com/@handle` をフェッチし、`"externalId":"UC..."` パターンでチャンネルID を取得する。`"channelId"` はページ内に複数回出現し関連チャンネルのIDを拾うリスクがあるため使用しない。
 
 ### manifest.json の主要設定
 
@@ -177,7 +220,7 @@ chrome.alarms 発火（定期）
   ↓
 登録チャンネル一覧・設定を storage から取得
   ↓
-全チャンネルの RSS フィードを並行 fetch
+全チャンネルの /live ページを並行 fetch
   ↓
 ┌─ active を検知（前回から状態変化あり）──────────────────────┐
 │  ├─ notificationEnabled なら通知（全チャンネル）             │
@@ -187,10 +230,12 @@ chrome.alarms 発火（定期）
 │     ├─ priorityEnabled OFF → 収集した全チャンネルのタブを開く│
 │     └─ priorityEnabled ON  → 配列インデックス最小の1件のみ  │
 └─────────────────────────────────────────────────────────────┘
-┌─ upcoming を検知（minutesBefore > 0）────────────────────────┐
-│  動画ページから scheduledStartTime をスクレイピング           │
-│  ├─ 取得成功：起動アラームをセット（チャンネルIDを記録）     │
-│  └─ 取得失敗：active 検知時にフォールバック                  │
+┌─ upcoming を検知（前回から状態変化あり）─────────────────────┐
+│  upcomingInfo に登録（videoId・title・scheduledAt）          │
+│  minutesBefore > 0 かつ scheduledAt あり：起動アラームをセット│
+└─────────────────────────────────────────────────────────────┘
+┌─ upcoming 継続中（状態変化なし）────────────────────────────┐
+│  title が未取得の場合のみ upcomingInfo.title を更新          │
 └─────────────────────────────────────────────────────────────┘
 ┌─ アラーム発火（予約済みタブ起動）───────────────────────────┐
 │  おやすみ時間外の場合のみ：                                 │
@@ -200,6 +245,8 @@ chrome.alarms 発火（定期）
   ↓
 状態を storage.local に保存
 ```
+
+---
 
 ## 優先順位の仕様
 
