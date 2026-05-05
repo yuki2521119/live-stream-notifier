@@ -1,12 +1,14 @@
+import { isQuietHours, decodeXml, extractVideoDetailsBlocks, selectToOpen } from './utils.js';
+
 // ─── 定数 ────────────────────────────────────────────────
-const POLL_ALARM = 'poll';
+const POLL_ALARM    = 'poll';
 const LAUNCH_PREFIX = 'launch_';
 
 const DEFAULT_SETTINGS = {
-  intervalMinutes: 5,
-  minutesBefore: 0,
+  intervalMinutes:     5,
+  minutesBefore:       0,
   notificationEnabled: true,
-  priorityEnabled: false,
+  priorityEnabled:     false,
   quietHours: { enabled: false, start: '23:00', end: '07:00' },
 };
 
@@ -17,62 +19,58 @@ async function getStorage() {
     chrome.storage.local.get(['liveState', 'upcomingInfo']),
   ]);
   return {
-    channels: sync.channels || [],
-    settings: { ...DEFAULT_SETTINGS, ...sync.settings },
-    liveState: local.liveState || {},
+    channels:     sync.channels  || [],
+    settings:     { ...DEFAULT_SETTINGS, ...sync.settings },
+    liveState:    local.liveState    || {},
     upcomingInfo: local.upcomingInfo || {},
   };
 }
 
-// ─── おやすみ時間判定 ─────────────────────────────────────
-function isQuietHours({ enabled, start, end }) {
-  if (!enabled) return false;
-  const now = new Date();
-  const cur = now.getHours() * 60 + now.getMinutes();
-  const [sh, sm] = start.split(':').map(Number);
-  const [eh, em] = end.split(':').map(Number);
-  const s = sh * 60 + sm;
-  const e = eh * 60 + em;
-  return s > e ? (cur >= s || cur < e) : (cur >= s && cur < e);
-}
-
-// ─── XML エンティティデコード ──────────────────────────────
-function decodeXml(str) {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-// ─── ライブ状態取得（/live ページ）───────────────────────
-// RSS には liveBroadcastStatus が含まれないため、
-// youtube.com/channel/CHANNEL_ID/live を取得して判定する
+// ─── ライブ状態取得（/live ページスクレイピング）─────────
 async function fetchLiveStatus(channelId) {
   try {
     const res = await fetch(`https://www.youtube.com/channel/${channelId}/live`);
-    if (!res.ok) return { status: 'offline', videoId: null, title: '', scheduledAt: null };
+    if (!res.ok) return offline();
     const html = await res.text();
 
-    const detailsMatch = html.match(/"videoId":"([a-zA-Z0-9_-]{11})","title":"((?:[^"\\]|\\.)*)"/);
-    const videoId = detailsMatch?.[1] ?? (html.match(/"videoId":"([a-zA-Z0-9_-]{11})"/) || [])[1] ?? null;
-    const title   = detailsMatch ? decodeXml(detailsMatch[2].replace(/\\"/g, '"')) : '';
+    const blocks = extractVideoDetailsBlocks(html);
+    if (!blocks.length) return offline();
 
-    const scheduledMatch = html.match(/"scheduledStartTime":"(\d+)"/);
-    if (html.includes('"isUpcoming":true') && videoId) {
-      return { status: 'upcoming', videoId, title, scheduledAt: scheduledMatch ? parseInt(scheduledMatch[1], 10) * 1000 : null };
+    let upcomingCandidate = null;
+
+    for (const section of blocks) {
+      const ownerChannelId = section.match(/"channelId":"([^"]+)"/)?.[1];
+      if (ownerChannelId !== channelId) continue;
+
+      const videoId    = section.match(/"videoId":"([a-zA-Z0-9_-]{11})"/)?.[1] ?? null;
+      const titleMatch = section.match(/"title":"((?:[^"\\]|\\.)*)"/);
+      const title      = titleMatch ? decodeXml(titleMatch[1].replace(/\\"/g, '"')) : '';
+      // scheduledStartTime は videoDetails 外に置かれることがあるためページ全体から検索
+      const schMatch   = html.match(/"scheduledStartTime":"(\d+)"/);
+      const scheduledAt = schMatch ? parseInt(schMatch[1], 10) * 1000 : null;
+
+      if (section.includes('"isLive":true') && videoId) {
+        return { status: 'active', videoId, title, scheduledAt: null };
+      }
+      if (section.includes('"isUpcoming":true') && videoId) {
+        if (!upcomingCandidate ||
+            (scheduledAt !== null &&
+             (upcomingCandidate.scheduledAt === null || scheduledAt < upcomingCandidate.scheduledAt))) {
+          upcomingCandidate = { videoId, title, scheduledAt };
+        }
+      }
     }
 
-    if (html.includes('"isLive":true') && videoId) {
-      return { status: 'active', videoId, title, scheduledAt: null };
-    }
-
-    return { status: 'offline', videoId: null, title: '', scheduledAt: null };
+    if (upcomingCandidate) return { status: 'upcoming', ...upcomingCandidate };
+    return offline();
   } catch (e) {
     console.error(`[fetchLiveStatus] ${channelId}:`, e);
-    return { status: 'offline', videoId: null, title: '', scheduledAt: null };
+    return offline();
   }
+}
+
+function offline() {
+  return { status: 'offline', videoId: null, title: '', scheduledAt: null };
 }
 
 // ─── 通知・タブ ───────────────────────────────────────────
@@ -81,22 +79,13 @@ function sendNotification(channel, status) {
     ? `🔴 ${channel.name} が配信を開始しました`
     : `📅 ${channel.name} の配信が予定されています`;
   chrome.notifications.create(`notif_${channel.id}`, {
-    type: 'basic',
-    iconUrl: 'icons/icon48.png',
-    title,
-    message: 'クリックして視聴する',
-    priority: 2,
+    type: 'basic', iconUrl: 'icons/icon48.png',
+    title, message: 'クリックして視聴する', priority: 2,
   });
 }
 
 function openTab(videoId) {
   chrome.tabs.create({ url: `https://www.youtube.com/watch?v=${videoId}` });
-}
-
-function selectToOpen(candidates, channels, priorityEnabled) {
-  if (!priorityEnabled) return candidates;
-  const top = channels.find(ch => candidates.some(c => c.id === ch.id));
-  return top ? [candidates.find(c => c.id === top.id)] : [];
 }
 
 // ─── アラーム管理 ─────────────────────────────────────────
@@ -108,16 +97,17 @@ async function setupPollAlarm(intervalMinutes) {
 
 // ─── upcoming 処理 ────────────────────────────────────────
 async function handleUpcoming(channel, videoId, title, scheduledAt, settings, upcomingInfo) {
-  if (upcomingInfo[channel.id]) return; // 重複スキップ
+  if (!upcomingInfo[channel.id]) {
+    upcomingInfo[channel.id] = { videoId, title, scheduledAt, alarmSet: false, tabOpened: false };
+  }
 
-  upcomingInfo[channel.id] = { videoId, title, scheduledAt, alarmSet: false };
-
-  if (channel.autoOpen && settings.minutesBefore > 0 && scheduledAt) {
+  const info = upcomingInfo[channel.id];
+  if (channel.autoOpen && settings.minutesBefore > 0 && scheduledAt && !info.alarmSet) {
     const fireAt = scheduledAt - settings.minutesBefore * 60 * 1000;
     if (fireAt > Date.now()) {
       chrome.alarms.create(LAUNCH_PREFIX + channel.id, { when: fireAt });
-      upcomingInfo[channel.id].alarmSet = true;
     }
+    upcomingInfo[channel.id].alarmSet = true;
   }
 }
 
@@ -135,22 +125,42 @@ async function checkAllChannels() {
   for (let i = 0; i < channels.length; i++) {
     const channel = channels[i];
     if (results[i].status !== 'fulfilled') continue;
+
     const { status, videoId, title, scheduledAt } = results[i].value;
     const prev = liveState[channel.id] || 'offline';
+
     if (prev === status) {
-      // タイトルが未取得のまま upcoming が継続している場合は更新する
-      if (status === 'upcoming' && title && newUpcomingInfo[channel.id] && !newUpcomingInfo[channel.id].title) {
-        newUpcomingInfo[channel.id] = { ...newUpcomingInfo[channel.id], title };
+      if (status === 'upcoming') {
+        const stored = newUpcomingInfo[channel.id];
+        if (stored && videoId && stored.videoId !== videoId) {
+          // 別の配信に切り替わった場合はリセット
+          chrome.alarms.clear(LAUNCH_PREFIX + channel.id);
+          newUpcomingInfo[channel.id] = { videoId, title, scheduledAt, alarmSet: false, tabOpened: false };
+          await handleUpcoming(channel, videoId, title, scheduledAt, settings, newUpcomingInfo);
+        } else if (stored) {
+          // タイトル・時刻が変わっていれば更新
+          const titleChanged     = title && title !== stored.title;
+          const scheduleChanged  = scheduledAt && scheduledAt !== stored.scheduledAt;
+          if (titleChanged || scheduleChanged) {
+            newUpcomingInfo[channel.id] = {
+              ...stored,
+              ...(titleChanged    ? { title }       : {}),
+              ...(scheduleChanged ? { scheduledAt, alarmSet: false } : {}),
+            };
+          }
+          if (!newUpcomingInfo[channel.id].alarmSet) {
+            await handleUpcoming(channel, stored.videoId, title || stored.title, scheduledAt || stored.scheduledAt, settings, newUpcomingInfo);
+          }
+        }
       }
       continue;
     }
 
     newLiveState[channel.id] = status;
 
-    if (settings.notificationEnabled) {
-      if (status === 'active' || (status === 'upcoming' && prev === 'offline')) {
-        sendNotification(channel, status);
-      }
+    if (settings.notificationEnabled &&
+        (status === 'active' || (status === 'upcoming' && prev === 'offline'))) {
+      sendNotification(channel, status);
     }
 
     if (status === 'upcoming') {
@@ -159,15 +169,9 @@ async function checkAllChannels() {
 
     if (status === 'active') {
       const info = newUpcomingInfo[channel.id];
-      if (channel.autoOpen) {
-        if (settings.minutesBefore === 0 || (info && info.scheduledAt === null)) {
-          newlyActive.push({ ...channel, videoId });
-        }
-      }
-      if (info) {
-        chrome.alarms.clear(LAUNCH_PREFIX + channel.id);
-        delete newUpcomingInfo[channel.id];
-      }
+      if (channel.autoOpen && !info?.tabOpened) newlyActive.push({ ...channel, videoId });
+      chrome.alarms.clear(LAUNCH_PREFIX + channel.id);
+      newUpcomingInfo[channel.id] = { videoId, title, scheduledAt: null, alarmSet: true, tabOpened: true };
     }
 
     if (status === 'offline' && newUpcomingInfo[channel.id]) {
@@ -189,24 +193,36 @@ async function handleLaunchAlarm(channelId) {
   const info = upcomingInfo[channelId];
   if (!info) return;
 
+  const newUpcomingInfo = { ...upcomingInfo };
   if (!isQuietHours(settings.quietHours)) {
     const channel = channels.find(ch => ch.id === channelId);
-    if (channel?.autoOpen) openTab(info.videoId);
+    if (channel?.autoOpen) {
+      openTab(info.videoId);
+      newUpcomingInfo[channelId] = { ...info, tabOpened: true };
+    }
   }
-
-  const newUpcomingInfo = { ...upcomingInfo };
-  delete newUpcomingInfo[channelId];
   await chrome.storage.local.set({ upcomingInfo: newUpcomingInfo });
+}
+
+// ─── 起動アラームのリセット（minutesBefore 変更時）────────
+async function refreshLaunchAlarms() {
+  const alarms = await chrome.alarms.getAll();
+  await Promise.allSettled(
+    alarms.filter(a => a.name.startsWith(LAUNCH_PREFIX)).map(a => chrome.alarms.clear(a.name))
+  );
+  const { upcomingInfo } = await getStorage();
+  const reset = Object.fromEntries(
+    Object.entries(upcomingInfo).map(([id, info]) => [id, { ...info, alarmSet: false, tabOpened: false }])
+  );
+  await chrome.storage.local.set({ upcomingInfo: reset });
+  await checkAllChannels();
 }
 
 // ─── イベントリスナー ─────────────────────────────────────
 chrome.runtime.onInstalled.addListener(async () => {
   const existing = await chrome.storage.sync.get(['channels', 'settings']);
   const settings = { ...DEFAULT_SETTINGS, ...existing.settings };
-  await chrome.storage.sync.set({
-    channels: existing.channels || [],
-    settings,
-  });
+  await chrome.storage.sync.set({ channels: existing.channels || [], settings });
   await setupPollAlarm(settings.intervalMinutes);
   await checkAllChannels();
 });
@@ -229,6 +245,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'RESET_ALARM') setupPollAlarm(msg.intervalMinutes);
   if (msg.type === 'CHECK_NOW') {
     checkAllChannels().finally(() => sendResponse({}));
+    return true;
+  }
+  if (msg.type === 'REFRESH_LAUNCH_ALARMS') {
+    refreshLaunchAlarms().finally(() => sendResponse({}));
     return true;
   }
 });

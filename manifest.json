@@ -5,7 +5,10 @@
   "description": "YouTubeチャンネルのライブ配信開始を検知し、自動でブラウザタブを開きます",
   "permissions": ["notifications", "tabs", "storage", "alarms"],
   "host_permissions": ["https://www.youtube.com/*"],
-  "background": { "service_worker": "background.js" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;"
+  },
+  "background": { "service_worker": "background.js", "type": "module" },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

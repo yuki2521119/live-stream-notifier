@@ -2,65 +2,103 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>LiveStream Notifier - 設定</title>
+  <title>LiveStream Notifier — 設定</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+JP:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-  <main>
-    <h1>設定</h1>
+  <header>
+    <div class="brand">
+      <div class="brand-pip"></div>
+      <span class="title">LiveStream<span class="title-accent">Notifier</span></span>
+    </div>
+    <span class="page-label">設定</span>
+  </header>
 
+  <main>
     <section>
+      <div class="section-title">ポーリング</div>
+
       <label class="field">
-        <span>ポーリング間隔</span>
+        <div class="field-label">
+          <span class="field-name">確認間隔</span>
+          <span class="field-desc">YouTube の配信状態をチェックする頻度</span>
+        </div>
         <div class="input-unit">
           <input id="interval" type="number" min="1" max="60" value="5">
-          <span>分</span>
+          <span class="unit">分</span>
         </div>
       </label>
 
       <label class="field">
-        <span>自動起動タイミング</span>
+        <div class="field-label">
+          <span class="field-name">自動起動タイミング</span>
+          <span class="field-desc">配信予定時刻の何分前にタブを開くか（0 = 配信開始時）</span>
+        </div>
         <div class="input-unit">
           <input id="minutes-before" type="number" min="0" max="60" value="0">
-          <span>分前（0 = 配信開始時）</span>
+          <span class="unit">分前</span>
         </div>
       </label>
     </section>
 
     <section>
-      <label class="field">
-        <span>デスクトップ通知</span>
+      <div class="section-title">通知</div>
+
+      <div class="field">
+        <div class="field-label">
+          <span class="field-name">デスクトップ通知</span>
+          <span class="field-desc">配信開始・予定検知時にシステム通知を表示する</span>
+        </div>
         <label class="toggle">
           <input id="notification" type="checkbox" checked>
           <span class="slider"></span>
         </label>
-      </label>
-    </section>
-
-    <section>
-      <label class="field">
-        <span>おやすみ時間</span>
-        <label class="toggle">
-          <input id="quiet-enabled" type="checkbox">
-          <span class="slider"></span>
-        </label>
-      </label>
-      <div id="quiet-range" class="sub-field" hidden>
-        <label>開始 <input id="quiet-start" type="time" value="23:00"></label>
-        <span>〜</span>
-        <label>終了 <input id="quiet-end" type="time" value="07:00"></label>
       </div>
     </section>
 
     <section>
-      <label class="field">
-        <span>優先順位モード</span>
+      <div class="section-title">おやすみ時間</div>
+
+      <div class="field">
+        <div class="field-label">
+          <span class="field-name">おやすみ時間を有効にする</span>
+          <span class="field-desc">指定した時間帯はタブの自動起動を停止する</span>
+        </div>
+        <label class="toggle">
+          <input id="quiet-enabled" type="checkbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div id="quiet-range" class="sub-field" hidden>
+        <label class="time-label">
+          <span>開始</span>
+          <input id="quiet-start" type="time" value="23:00">
+        </label>
+        <span class="time-sep">—</span>
+        <label class="time-label">
+          <span>終了</span>
+          <input id="quiet-end" type="time" value="07:00">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-title">優先順位</div>
+
+      <div class="field">
+        <div class="field-label">
+          <span class="field-name">優先順位モード</span>
+          <span class="field-desc">複数チャンネルが同時に配信開始した場合、最上位の 1 件のみタブを開く</span>
+        </div>
         <label class="toggle">
           <input id="priority-enabled" type="checkbox">
           <span class="slider"></span>
         </label>
-      </label>
-      <p class="hint">ON にすると、複数チャンネルが同時に配信開始した場合、最上位の 1 件のみタブを開きます。</p>
+      </div>
 
       <div id="priority-list-wrap">
         <p class="sub-label">並び順（上が優先）</p>
@@ -70,7 +108,7 @@
 
     <div class="actions">
       <span id="save-msg" class="save-msg"></span>
-      <button id="save-btn">保存</button>
+      <button id="save-btn">保存する</button>
     </div>
   </main>
 

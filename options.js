@@ -111,6 +111,13 @@ async function init() {
       chrome.runtime.sendMessage({ type: 'RESET_ALARM', intervalMinutes });
     }
 
+    // minutesBefore が変わった場合は既存アラームをリセット、そうでなければ即時チェック
+    if (newSettings.minutesBefore !== settings.minutesBefore) {
+      chrome.runtime.sendMessage({ type: 'REFRESH_LAUNCH_ALARMS' });
+    } else {
+      chrome.runtime.sendMessage({ type: 'CHECK_NOW' });
+    }
+
     const msg = document.getElementById('save-msg');
     msg.textContent = '保存しました';
     setTimeout(() => { msg.textContent = ''; }, 2000);

@@ -1,5 +1,6 @@
-const STATUS_ICON  = { active: '🔴', upcoming: '📅', offline: '⚫' };
-const STATUS_LABEL = { active: '配信中', upcoming: '配信予定', offline: 'オフライン' };
+import { formatScheduledAt, resolveChannelInput } from './utils.js';
+
+const STATUS_LABEL = { active: 'LIVE', upcoming: '配信予定', offline: 'オフライン' };
 
 async function loadData() {
   const [sync, local] = await Promise.all([
@@ -17,50 +18,6 @@ async function saveChannels(channels) {
   await chrome.storage.sync.set({ channels });
 }
 
-// ─── チャンネル入力の解決 ─────────────────────────────────
-// @ハンドル・URL・チャンネルID を受け取り { id, name } を返す
-async function resolveChannelInput(input) {
-  const s = input.trim();
-
-  // チャンネルID（UCから始まる24文字）
-  if (/^UC[\w-]{22}$/.test(s)) return { id: s, name: null };
-
-  // URL中にチャンネルIDが含まれる場合
-  const idFromUrl = s.match(/youtube\.com\/channel\/(UC[\w-]{22})/);
-  if (idFromUrl) return { id: idFromUrl[1], name: null };
-
-  // @ハンドルを特定（URL形式またはそのまま）
-  let handle = null;
-  const handleFromUrl = s.match(/youtube\.com\/@([\w.-]+)/);
-  if (handleFromUrl)    handle = handleFromUrl[1];
-  else if (s.startsWith('@')) handle = s.slice(1);
-  if (!handle) return null;
-
-  // チャンネルページをフェッチしてIDと名前を取得
-  const res = await fetch(`https://www.youtube.com/@${handle}`);
-  if (!res.ok) return null;
-  const html = await res.text();
-
-  const idMatch = html.match(/"externalId":"(UC[\w-]{22})"/);
-  if (!idMatch) return null;
-
-  const nameTitleTag = html.match(/<meta[^>]*property="og:title"[^>]*>/);
-  const nameMatch    = nameTitleTag ? nameTitleTag[0].match(/content="([^"]+)"/) : null;
-  return { id: idMatch[1], name: nameMatch ? nameMatch[1] : handle };
-}
-
-function formatScheduledAt(ms) {
-  if (!ms) return '時刻不明';
-  const d   = new Date(ms);
-  const now = new Date();
-  const time = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (d.toDateString() === now.toDateString())      return `今日 ${time}`;
-  if (d.toDateString() === tomorrow.toDateString()) return `明日 ${time}`;
-  return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
-}
-
 function renderList(channels, liveState, upcomingInfo) {
   const list = document.getElementById('channel-list');
   if (!channels.length) {
@@ -70,19 +27,22 @@ function renderList(channels, liveState, upcomingInfo) {
   list.innerHTML = channels.map((ch, i) => {
     const st   = liveState[ch.id] || 'offline';
     const info = upcomingInfo[ch.id];
-    const sub  = (st === 'upcoming' && info)
+    // upcoming は時刻を status-label の位置に表示、時刻不明なら「配信予定」
+    const statusText = (st === 'upcoming' && info?.scheduledAt)
+      ? formatScheduledAt(info.scheduledAt)
+      : STATUS_LABEL[st] || '';
+    const sub  = ((st === 'upcoming' || st === 'active') && info && info.title)
       ? `<div class="stream-info">
-           <span class="stream-title">${info.title || '（タイトル不明）'}</span>
-           <span class="stream-time">${formatScheduledAt(info.scheduledAt)}</span>
+           <span class="stream-title">${info.title}</span>
          </div>`
       : '';
     return `
-      <div class="channel-item" data-index="${i}">
+      <div class="channel-item" data-index="${i}" data-status="${st}">
         <div class="channel-main">
-          <span class="status-icon">${STATUS_ICON[st] || '⚫'}</span>
+          <div class="status-dot"></div>
           <div class="channel-body">
             <span class="channel-name" title="${ch.name}">${ch.name}</span>
-            <span class="status-label">${STATUS_LABEL[st] || ''}</span>
+            <span class="status-label">${statusText}</span>
           </div>
           <label class="toggle" title="自動起動">
             <input type="checkbox" class="auto-open" data-index="${i}" ${ch.autoOpen ? 'checked' : ''}>
@@ -195,6 +155,8 @@ async function init() {
     const i = Number(e.target.dataset.index);
     channels[i] = { ...channels[i], autoOpen: e.target.checked };
     await saveChannels(channels);
+    // トグル変更を即座にバックグラウンドへ反映
+    chrome.runtime.sendMessage({ type: 'CHECK_NOW' });
   });
 
   document.getElementById('channel-list').addEventListener('click', async (e) => {
