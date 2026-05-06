@@ -5,6 +5,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "sharp": "^0.34.5",
     "vitest": "^2.0.0"
   }
 }
