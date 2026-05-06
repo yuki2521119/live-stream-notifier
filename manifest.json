@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "LiveStream Notifier",
+  "name": "StreamLauncher",
   "version": "1.0.0",
   "description": "YouTubeチャンネルのライブ配信開始を検知し、自動でブラウザタブを開きます",
   "permissions": ["notifications", "tabs", "storage", "alarms"],

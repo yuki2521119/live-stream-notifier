@@ -69,7 +69,7 @@ YouTube チャンネルの配信開始を自動検知し、指定時間にタブ
 
 ### 詳細説明（案）
 ```
-LiveStream Notifier は、登録した YouTube チャンネルのライブ配信を
+StreamLauncher は、登録した YouTube チャンネルのライブ配信を
 バックグラウンドで自動監視する Chrome 拡張機能です。
 
 【主な機能】

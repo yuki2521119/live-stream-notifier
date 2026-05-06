@@ -1,4 +1,4 @@
-# LiveStream Notifier
+# StreamLauncher
 
 YouTubeチャンネルのライブ配信開始を検知し、自動でブラウザタブを開くChrome拡張。
 
