@@ -1,14 +1,26 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ff3355"/>
-      <stop offset="100%" stop-color="#cc0022"/>
+    <linearGradient id="bgDot" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#141428"/>
+      <stop offset="100%" stop-color="#08080f"/>
     </linearGradient>
+    <radialGradient id="dotGrad" cx="42%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ff5577"/>
+      <stop offset="100%" stop-color="#cc0022"/>
+    </radialGradient>
   </defs>
-  <rect width="512" height="512" rx="100" fill="url(#bg)"/>
-  <path d="M 80 230 A 196 196 0 0 1 432 230" fill="none" stroke="white" stroke-width="28" stroke-linecap="round" opacity="0.25"/>
-  <path d="M 128 284 A 140 140 0 0 1 384 284" fill="none" stroke="white" stroke-width="30" stroke-linecap="round" opacity="0.55"/>
-  <path d="M 178 336 A 86 86 0 0 1 334 336" fill="none" stroke="white" stroke-width="34" stroke-linecap="round" opacity="0.95"/>
-  <circle cx="256" cy="390" r="46" fill="white" opacity="0.2"/>
-  <circle cx="256" cy="390" r="34" fill="white"/>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bgDot)"/>
+  <!-- Outer pulse ring 3 -->
+  <circle cx="256" cy="256" r="190" fill="none" stroke="#ff1744" stroke-width="6" opacity="0.1"/>
+  <!-- Outer pulse ring 2 -->
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#ff1744" stroke-width="8" opacity="0.2"/>
+  <!-- Outer pulse ring 1 -->
+  <circle cx="256" cy="256" r="110" fill="none" stroke="#ff1744" stroke-width="10" opacity="0.35"/>
+  <!-- Glow halo -->
+  <circle cx="256" cy="256" r="80" fill="#ff1744" opacity="0.15"/>
+  <!-- Main dot -->
+  <circle cx="256" cy="256" r="72" fill="url(#dotGrad)"/>
+  <!-- Highlight -->
+  <circle cx="234" cy="232" r="22" fill="white" opacity="0.3"/>
 </svg>
