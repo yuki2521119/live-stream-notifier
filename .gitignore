@@ -2,3 +2,5 @@ node_modules/
 .claude/
 .playwright-mcp/
 skills/
+icon_gen.html
+icon_preview.png
