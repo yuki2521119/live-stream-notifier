@@ -33,7 +33,7 @@ function renderList(channels, liveState, upcomingInfo) {
       : STATUS_LABEL[st] || '';
     const sub  = ((st === 'upcoming' || st === 'active') && info && info.title)
       ? `<div class="stream-info">
-           <span class="stream-title">${info.title}</span>
+           <span class="stream-title" data-video-id="${info.videoId}" title="クリックで配信を開く">${info.title}</span>
          </div>`
       : '';
     return `
@@ -147,6 +147,13 @@ async function init() {
     addForm.hidden = true;
     addToggle.hidden = false;
     chrome.runtime.sendMessage({ type: 'CHECK_NOW' });
+  });
+
+  // 配信タイトルクリック → 別タブで開く
+  document.getElementById('channel-list').addEventListener('click', (e) => {
+    const title = e.target.closest('.stream-title');
+    if (!title?.dataset.videoId) return;
+    chrome.tabs.create({ url: `https://www.youtube.com/watch?v=${title.dataset.videoId}` });
   });
 
   // イベント委任：トグル・削除

@@ -259,6 +259,16 @@ header::after {
   word-break: break-word;
   line-height: 1.55;
   opacity: 0.8;
+  cursor: pointer;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.stream-title:hover {
+  opacity: 1;
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-color: var(--text-muted);
+  text-underline-offset: 2px;
 }
 
 .channel-item[data-status="active"] .stream-title {
